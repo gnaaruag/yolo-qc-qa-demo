@@ -11,6 +11,13 @@ from utils import get_coords
 from utils import show_plot
 from utils import get_init_frame
 from utils import yolo_inference
+import toml
+
+with open(".streamlit/secrets.toml", "r") as f:
+    secrets = toml.load(f)
+
+os.environ['REPLICATE_API_TOKEN'] = secrets["REPLICATE_API_TOKEN"]
+
 
 def process_data(checkbox1, checkbox2, file, input_text):
 	if checkbox1:
