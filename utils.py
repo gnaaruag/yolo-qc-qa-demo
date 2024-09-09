@@ -6,6 +6,8 @@ import numpy as np
 import replicate
 import streamlit as st
 from PIL import Image
+import boto3
+from botocore.exceptions import NoCredentialsError
 
 def get_init_frame(video_path, output_path):
 	# Create the output directory if it doesn't exist
@@ -56,8 +58,23 @@ def show_plot(frame_path, coords):
 		coords = coords.reshape(-1, 2)
 	plt.scatter(coords[:, 0], coords[:, 1], marker='*', color='red')
 	st.pyplot(plt)
+ 
+def upload_to_s3(local_file, bucket, s3_file):
+	s3 = boto3.client('s3')
+	try:
+		s3.upload_file(local_file, bucket, s3_file)
+		file_url = f"https://{bucket}.s3.ap-south-1.amazonaws.com/{s3_file}"
+		print(f"File successfully uploaded to {file_url}")
+		return file_url
+	except FileNotFoundError:
+		print("The file was not found.")
+		return None
+	except NoCredentialsError:
+		print("Credentials not available.")
+		return None
+	
 
-def yolo_inference(video_path, output_path, input_text):
+def yolo_inference(video_path, output_path, input_text, input_media):
     # Create the output directory if it doesn't exist
     os.makedirs(os.path.join(output_path), exist_ok=True)
     
@@ -65,8 +82,9 @@ def yolo_inference(video_path, output_path, input_text):
     video = cv2.VideoCapture(video_path)
     
     # Initialize frame counter
+    print(input_media)
     input = {
-		"input_media": "https://replicate.delivery/pbxt/LXHeP3A0Z2LV8KU0TLruS39fVY5ldqVnHABbv6yfUDXnmvKB/test_small.mp4",
+		"input_media": input_media,
 		"class_names": input_text,
 		"return_json": True,
 		"score_thr": 0.3
