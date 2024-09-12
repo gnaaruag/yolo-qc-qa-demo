@@ -8,6 +8,8 @@ import streamlit as st
 from PIL import Image
 import boto3
 from botocore.exceptions import NoCredentialsError
+from datetime import timedelta
+
 
 def get_init_frame(video_path, output_path):
 	# Create the output directory if it doesn't exist
@@ -15,6 +17,8 @@ def get_init_frame(video_path, output_path):
 
 	# Open the video file
 	video = cv2.VideoCapture(video_path)
+	fps = video.get(cv2.CAP_PROP_FPS)
+	print(f"Frames per second: {fps}")
 
 	# Initialize frame counter
 	frame_count = 0
@@ -36,6 +40,7 @@ def get_init_frame(video_path, output_path):
 
 	# Release the video file
 	video.release()
+	return fps
 
 def get_coords(coords):
 	data = coords
@@ -47,7 +52,7 @@ def get_coords(coords):
 			center_y = (y0 + y1) // 2
 			glove_instances.append([center_x, center_y])
 	glove_instances = np.array(glove_instances)
-	st.write(glove_instances)
+	# st.write(glove_instances)
 	return glove_instances
 
 def show_plot(frame_path, coords):
@@ -94,10 +99,59 @@ def yolo_inference(video_path, output_path, input_text, input_media):
 		"zsxkib/yolo-world:d232445620610b78671a7f288f37bf3baec831537503e9064afcf0bfd0f0a151",
 		input=input
 	)
-    
-	
-		
-    
-    
-    
+    print(output)
     return output
+
+
+def merge_time_ranges(timestamps):
+    # Convert "MM:SS" to total seconds
+    def time_to_seconds(time_str):
+        minutes, seconds = map(int, time_str.split(":"))
+        return minutes * 60 + seconds
+
+    # Convert total seconds back to "MM:SS"
+    def seconds_to_time(seconds):
+        minutes = seconds // 60
+        seconds = seconds % 60
+        return f"{minutes:02}:{seconds:02}"
+
+    # Merge overlapping or continuous time ranges
+    def merge_ranges(ranges):
+        # Sort ranges by their start time
+        ranges.sort()
+
+        # Initialize the merged list
+        merged = [ranges[0]]
+
+        for current in ranges[1:]:
+            prev_start, prev_end = merged[-1]
+            current_start, current_end = current
+
+            # Merge if overlapping or continuous
+            if current_start <= prev_end + 1:
+                merged[-1] = (prev_start, max(prev_end, current_end))
+            else:
+                merged.append(current)
+
+        return merged
+
+    # Step 1: Convert all timestamp ranges to seconds
+    time_ranges = []
+    for t in timestamps:
+        if "-" in t:
+            start, end = t.split("-")
+            time_ranges.append((time_to_seconds(start), time_to_seconds(end)))
+        else:
+            # Single timestamps are treated as a range from (t, t)
+            time_in_seconds = time_to_seconds(t)
+            time_ranges.append((time_in_seconds, time_in_seconds))
+
+    # Step 2: Merge the ranges
+    merged_ranges = merge_ranges(time_ranges)
+
+    # Step 3: Convert the merged ranges back to "MM:SS"
+    merged_timestamps = [f"{seconds_to_time(start)}-{seconds_to_time(end)}" for start, end in merged_ranges]
+
+    return merged_timestamps
+
+
